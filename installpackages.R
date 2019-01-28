@@ -1,0 +1,7 @@
+if(require('R.utils') == FALSE) install.packages('R.utils')
+if(require('raster') == FALSE) install.packages('raster')
+if(require('rgdal') == FALSE) install.packages('rgdal')
+if(require('maptools') == FALSE) install.packages('maptools')
+if(require('ncdf4') == FALSE) install.packages('ncdf4')
+if(require('sp') == FALSE) install.packages('sp')
+if(require('snow') == FALSE) install.packages('snow')
