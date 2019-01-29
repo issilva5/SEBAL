@@ -15,6 +15,7 @@ library(maptools)
 library(ncdf4)
 library(sp)
 library(snow)
+library(here)
 
 args = commandArgs(trailingOnly=TRUE)
 WD <- args[1]
@@ -24,14 +25,14 @@ setwd(WD) # Working Directory
 rasterOptions(tmpdir=args[2])
 
 # Load the source code in landsat.R to this code
-source("landsat2.R")
+source(here("workspace/R", "landsat3.R"))
 
 # File that stores the Image Directories (TIFs, MTL, FMask)
 dados <- read.csv("dados.csv", sep=";", stringsAsFactors=FALSE)
 
 #################################### Constants ##########################################
 
-k <- 0.41		# Von K?rm?n
+k <- 0.41		# Von Karman
 g <- 9.81		# Gravity
 rho <- 1.15		# Air density
 cp <- 1004		# Specific heat of air
@@ -291,6 +292,8 @@ tryCatch({
   cat("Output write raster timedout. Exiting with 124 code...\n");
   quit("no", 124, FALSE)
 })
+
+proc.time()
 
 #########################################################################################
 
