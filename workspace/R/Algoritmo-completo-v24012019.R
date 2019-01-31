@@ -28,7 +28,7 @@ rasterOptions(tmpdir=args[2])
 source(here("workspace/R", "landsat3.R"))
 
 # File that stores the Image Directories (TIFs, MTL, FMask)
-dados <- read.csv("dados.csv", sep=";", stringsAsFactors=FALSE)
+dados <- read.csv(here("workspace/R", "dados.csv"), sep=";", stringsAsFactors=FALSE)
 
 #################################### Constants ##########################################
 
@@ -41,13 +41,13 @@ clusters <- 7		# Number of clusters used in image processing - some raster libra
 
 ######################### Reading sensor parameters #####################################
 
-p.s.TM1 <- read.csv("parametros do sensor/parametrosdosensorTM1.csv", sep=";", stringsAsFactors=FALSE)
-p.s.TM2 <- read.csv("parametros do sensor/parametrosdosensorTM2.csv", sep=";", stringsAsFactors=FALSE)
-p.s.ETM <- read.csv("parametros do sensor/parametrosdosensorETM.csv" , sep=";", stringsAsFactors=FALSE)
-p.s.LC <- read.csv("parametros do sensor/parametrosdosensorLC.csv", sep=";", stringsAsFactors=FALSE)
+p.s.TM1 <- read.csv(here("workspace/R", "parametros do sensor/parametrosdosensorTM1.csv"), sep=";", stringsAsFactors=FALSE)
+p.s.TM2 <- read.csv(here("workspace/R", "parametros do sensor/parametrosdosensorTM2.csv"), sep=";", stringsAsFactors=FALSE)
+p.s.ETM <- read.csv(here("workspace/R", "parametros do sensor/parametrosdosensorETM.csv"), sep=";", stringsAsFactors=FALSE)
+p.s.LC <- read.csv(here("workspace/R", "parametros do sensor/parametrosdosensorLC.csv"), sep=";", stringsAsFactors=FALSE)
 
 # Read relative distance from Sun to Earth
-load("d_sun_earth.RData")
+load(here("workspace/R", "d_sun_earth.RData"))
 
 # Set projection and spatial resolution
 WGS84 <- "+proj=longlat +datum=WGS84 +ellps=WGS84"
@@ -106,14 +106,16 @@ getBandsPath <- function(n.sensor){
       }
     }
   }
-  
+
   return(bands_path)
 }
+
+proc.time()
 
 # Reading
 fic.st <- stack(as.list(getBandsPath(n.sensor)))
 
-proc.time()
+print(proc.time())
 
 ################################# Fmask ###########################################
 
@@ -132,15 +134,15 @@ for (i in 1:nlayers(fic.st)) {
   fic.st[[i]][] <- f 
 }
 
-proc.time()
+print(proc.time())
 
 if (0.99<=(sum(is.na(values(fic.st)))/7)/(fic.st@ncols*fic.st@nrows)) { 
 	print("Imagem incompativel para o processamento,mais de 99% nuvem e sombra de nuvem")
 	quit("no", 1, FALSE)
 }
 
-proc.time()
-
+print(proc.time())
+q()
 # Changing the projection of the images (UTM to GEO)
 # This operation can be done in a parallel way by Clusters, projectRaster is implemented to naturally be executed by clusters
 # The number of used clusters is given by the 'clusters' constant
@@ -308,7 +310,7 @@ for(i in 1:length(variablesNames)){
 	proc.time()
 
 	#Opening old NetCDF
-	var_output <- paste(dados$Path.Output, "/", fic, end_file_name, sep="")
+	var_output <- paste(dados$Path.Output[1], "/", fic, end_file_name, sep="")
 	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
 
 	proc.time()
@@ -551,8 +553,8 @@ phase2 <- function() {
 	EF<-NDVI
 	EF[]<-LE/(Rn[]-G[])
 	
-	# Sensible heat flux 24 hours (H24h)
-	H24h_dB<-(1-EF[])*Rn24h_dB
+	# Sensible heat flux 24 hours (H24h), nao foi usado
+	# H24h_dB<-(1-EF[])*Rn24h_dB
 	
 	# Latent Heat Flux 24 hours (LE24h)
 	LE24h_dB<-EF[]*Rn24h_dB
