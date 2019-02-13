@@ -445,7 +445,7 @@ windVelocity200 <- function(){
 }
 
 phase2 <- function() {
-	######################## Selection of reference pixels ###################################
+	####################### Selection of reference pixels ###################################
 	
 	# Getting the rasters output
 	Rn<-output[[1]]
