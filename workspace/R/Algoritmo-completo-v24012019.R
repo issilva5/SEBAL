@@ -1,4 +1,4 @@
-########################################################################################
+######################################################################################
 #                                                                                      #
 #                         EU BRAZIL Cloud Connect                                      #
 #                                                                                      #
@@ -25,10 +25,12 @@ setwd(WD) # Working Directory
 rasterOptions(tmpdir=args[2])
 
 # Load the source code in landsat.R to this code
-source(here("workspace/R", "landsat3.R"))
+source(here("workspace/R", "landsat2.R"))
 
 # File that stores the Image Directories (TIFs, MTL, FMask)
 dados <- read.csv(here("workspace/R", "dados.csv"), sep=";", stringsAsFactors=FALSE)
+
+auxProc1 <- proc.time()
 
 #################################### Constants ##########################################
 
@@ -142,7 +144,7 @@ if (0.99<=(sum(is.na(values(fic.st)))/7)/(fic.st@ncols*fic.st@nrows)) {
 }
 
 print(proc.time())
-q()
+
 # Changing the projection of the images (UTM to GEO)
 # This operation can be done in a parallel way by Clusters, projectRaster is implemented to naturally be executed by clusters
 # The number of used clusters is given by the 'clusters' constant
@@ -151,21 +153,21 @@ q()
 	fic.st <- projectRaster(fic.st, crs=WGS84)
 #endCluster()
 
-proc.time()
+print(proc.time())
 
 # Reading Bounding Box
 # The Bounding Box area that is important and has less noise in the Image
-fic.bounding.boxes <- paste("wrs2_asc_desc/wrs2_asc_desc.shp")
+fic.bounding.boxes <- paste(here("workspace/R", "wrs2_asc_desc/wrs2_asc_desc.shp"))
 BoundingBoxes <- readShapePoly(fic.bounding.boxes, proj4string=CRS(WGS84))
 BoundingBox <- BoundingBoxes[BoundingBoxes@data$WRSPR == WRSPR, ]
 
 # Reading Elevation
 # Read the File that stores the Elevation of the image area, this influence on some calculations
-fic.elevation <- paste("Elevation/srtm_29_14.tif")
+fic.elevation <- paste(here("workspace/R", "Elevation/srtm_29_14.tif"))
 raster.elevation <- raster(fic.elevation)
 raster.elevation <- crop(raster.elevation, extent(BoundingBox))
 
-proc.time()
+print(proc.time())
 
 # Setting the raster elevation resolution as equals to the Fmask raster resolution
 raster.elevation.aux <- raster(raster.elevation)
@@ -176,7 +178,7 @@ beginCluster(clusters) # ?? beginClusters, whereis endClusters??
 	raster.elevation <- resample(raster.elevation, raster.elevation.aux, method="ngb")
 endCluster()
 
-proc.time()
+print(proc.time())
 
 #################### Resampling satellite bands images #####################################
 
@@ -198,7 +200,7 @@ imageResample <- function() {
 
 res <- NULL;
 tryCatch({
-  res <- evalWithTimeout({
+  res <- withTimeout({
     image.rec <- imageResample();
   }, timeout=3600);
 }, TimeoutException=function(ex) {
@@ -208,7 +210,7 @@ tryCatch({
 
 ############################################################################################
 
-proc.time()
+print(proc.time())
 
 # Reading file Station weather
 fic.sw <- dados$File.Station.Weather[1]
@@ -217,7 +219,8 @@ table.sw <- (read.csv(fic.sw, sep=";", header=FALSE, stringsAsFactors=FALSE))
 # Transmissivity 
 tal <- 0.75+2*10^-5*raster.elevation
 
-proc.time()
+print(proc.time())
+print("Fim da fase 1 - pre-processamento")
 
 ################## Phase 1: Calculating the image energy balance ##################################
 
@@ -233,8 +236,8 @@ outputLandsat <- function() {
 # timeout now is 7200 (cause: Azure slowness)
 res <- NULL;
 tryCatch({
-  res <- evalWithTimeout({
-    output <- outputLandsat();
+  res <- withTimeout({
+    output <- outputLandsat(); print("sai da landasat3.R");
   }, timeout=7200);
 }, TimeoutException=function(ex) {
   cat("Output landsat timedout. Exiting with 124 code...\n");
@@ -243,8 +246,8 @@ tryCatch({
 
 ###########################################################################################
 
-proc.time()
-
+auxProc12 <- proc.time()
+print(auxProc12)
 ################## Masking landsat rasters output #########################################
 
 # This block mask the values in the landsat output rasters that has cloud cells and are inside the Bounding Box required
@@ -260,7 +263,7 @@ outputMask <- function() {
 
 res <- NULL;
 tryCatch({
-  res <- evalWithTimeout({
+  res <- withTimeout({
     output <- outputMask();
   }, timeout=10800);
 }, TimeoutException=function(ex) {
@@ -270,7 +273,7 @@ tryCatch({
 
 ##########################################################################################
 
-proc.time()
+print(proc.time())
 
 ################## Write to files landsat output rasters #################################
 
@@ -287,7 +290,7 @@ outputWriteRaster <- function() {
 
 res <- NULL;
 tryCatch({
-  res <- evalWithTimeout({
+  res <- withTimeout({
     outputWriteRaster();
   }, timeout=10800);
 }, TimeoutException=function(ex) {
@@ -306,7 +309,6 @@ dimLonDef <- NULL
 for(i in 1:length(variablesNames)){
 
 	end_file_name <- paste("_", variablesNames[i], ".nc", sep="")
-
 	proc.time()
 
 	#Opening old NetCDF
@@ -344,9 +346,24 @@ for(i in 1:length(variablesNames)){
 # https://www.rdocumentation.org/packages/ncdf4/versions/1.16/topics/ncvar_put
 
 
-proc.time()
+print(proc.time())
+print("Fim da fase 2 - Calculo do Rn e G")
 
 ################################################################################################
+
+	#CONSTANTES
+	# Weather station data
+    x<-3                                    # Wind speed sensor Height (meters)
+    hc<-0.2                                 # Vegetation height (meters)
+    Lat<-table.sw$V4[1]     # Station Latitude
+    Long<-table.sw$V5[1]    # Station Longitude
+
+    # Surface roughness parameters in station
+    azom <- -3              #Parameter for the Zom image
+    bzom <- 6.47    #Parameter for the Zom image
+    F_int <- 0.16   #internalization factor for Rs 24 calculation (default value)
+
+
 
 hotPixelSelection <- function(Rn, G, TS, NDVI){
 
@@ -361,8 +378,8 @@ hotPixelSelection <- function(Rn, G, TS, NDVI){
 		xy.hot <- xyFromCell(TS, ll.hot)
 		ll.hot.f<-cbind(as.vector(xy.hot[1,1]), as.vector(xy.hot[1,2]))
 	  }else{
-		HO.c.hot.min<-sort(HO.c.hot)[round(0.25*length(HO.c.hot))]
-		HO.c.hot.max<-sort(HO.c.hot)[round(0.75*length(HO.c.hot))]
+		HO.c.hot.min<-sort(HO.c.hot)[ceiling(0.25*length(HO.c.hot))]
+		HO.c.hot.max<-sort(HO.c.hot)[ceiling(0.75*length(HO.c.hot))]
 		ll.hot<-which(TS[]==TS.c.hot & HO[]>HO.c.hot.min & HO[]<HO.c.hot.max)
 		xy.hot <- xyFromCell(TS, ll.hot)
 		NDVI.hot<-extract(NDVI,xy.hot, buffer=105)
@@ -376,29 +393,38 @@ hotPixelSelection <- function(Rn, G, TS, NDVI){
 }
 
 coldPixelSelection <- function(Rn, G, TS, NDVI){
-
+		
 	HO<-Rn[]-G[] # Read as a Vector
+	
 	x<-TS[][(NDVI[]<0 &!is.na(NDVI[])) & !is.na(HO)]
 	x<-x[x>273.16]
+	
 	TS.c.cold<-sort(x)[round(0.5*length(x))]
+	
 	HO.c.cold<-HO[(NDVI[]<0 & !is.na(NDVI[])) & TS[]==TS.c.cold & !is.na(HO)]
-
+	
 	if (length(HO.c.cold)==1){
 		ll.cold<-which(TS[]==TS.c.cold & HO==HO.c.cold)
 		xy.cold <- xyFromCell(TS, ll.cold)
 		ll.cold.f<-cbind(as.vector(xy.cold[1,1]), as.vector(xy.cold[1,2]))
 	}else{
-		HO.c.cold.min<-sort(HO.c.cold)[round(0.25*length(HO.c.cold))]
-		HO.c.cold.max<-sort(HO.c.cold)[round(0.75*length(HO.c.cold))]
-		ll.cold<-which(TS[]==TS.c.cold & (HO>HO.c.cold.min &!is.na(HO)) & (HO<HO.c.cold.max & !is.na(HO)))
+		HO.c.cold.min<-sort(HO.c.cold)[ceiling(0.25*length(HO.c.cold))]
+		HO.c.cold.max<-sort(HO.c.cold)[ceiling(0.75*length(HO.c.cold))]
+		
+		ll.cold<-which(TS[]==TS.c.cold & (HO>=HO.c.cold.min &!is.na(HO)) & (HO<=HO.c.cold.max & !is.na(HO)))
+		
 		xy.cold <- xyFromCell(TS, ll.cold)
+		
 		NDVI.cold<-extract(NDVI,xy.cold, buffer=105)
+		
 		NDVI.cold.2<-NDVI.cold[!sapply(NDVI.cold, is.null)]
-	
+		
 		# Maximum number of neighboring pixels with $NVDI < 0$
 		t<-function(x){ sum(x<0,na.rm = TRUE)}
 		n.neg.NDVI<-sapply(NDVI.cold.2,t)
+		
 		i.NDVI.cold<-which.max(n.neg.NDVI)
+		
 		ll.cold.f<-cbind(as.vector(xy.cold[i.NDVI.cold,1]), as.vector(xy.cold[i.NDVI.cold,2]))
 	}
 
@@ -437,21 +463,20 @@ phase2 <- function() {
 	ll_ref<-rbind(ll.hot.f[1,],ll.cold.f[1,])
 	colnames(ll_ref)<-c("long", "lat")
 	rownames(ll_ref)<-c("hot","cold")
-	
 	print(proc.time())
 	
 	####################################################################################
 	
 	# Weather station data
-	x<-3 					# Wind speed sensor Height (meters)
-	hc<-0.2 				# Vegetation height (meters)
-	Lat<-table.sw$V4[1] 	# Station Latitude
-	Long<-table.sw$V5[1] 	# Station Longitude
+#	x<-3 					# Wind speed sensor Height (meters)
+#	hc<-0.2 				# Vegetation height (meters)
+#	Lat<-table.sw$V4[1] 	# Station Latitude
+#	Long<-table.sw$V5[1] 	# Station Longitude
 	
 	# Surface roughness parameters in station
-	azom <- -3		#Parameter for the Zom image
-	bzom <- 6.47	#Parameter for the Zom image
-	F_int <- 0.16	#internalization factor for Rs 24 calculation (default value)
+#	azom <- -3		#Parameter for the Zom image
+#	bzom <- 6.47	#Parameter for the Zom image
+#	F_int <- 0.16	#internalization factor for Rs 24 calculation (default value)
 	
 	print(proc.time())
 	
@@ -481,7 +506,6 @@ phase2 <- function() {
 	Erro<-TRUE
 	
 	print(proc.time())
-	
 	# Beginning of the cycle stability
 	while(Erro){
 	  rah.hot.0<-value.pixel.rah[i] # Value
@@ -603,7 +627,7 @@ phase2 <- function() {
 }
 
 tryCatch({
-  res <- evalWithTimeout({
+  res <- withTimeout({
     phase2();
   }, timeout=5400);
 }, TimeoutException=function(ex) {
@@ -611,4 +635,5 @@ tryCatch({
   quit("no", 124, FALSE)
 })
 
-proc.time()
+print(proc.time())
+print("Fim da fase 3 - Calculo da evapotranspiracao")
