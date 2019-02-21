@@ -9,17 +9,8 @@ TMP_DIR_PATH=$3
 NUMBER_OF_TIMEOUTS=0
 
 echo "Executing R script..."
-Rscript $R_ALGORITHM_PATH $R_EXEC_DIR $TMP_DIR_PATH > $TMP_DIR_PATH/out &
+Rscript $R_ALGORITHM_PATH $R_EXEC_DIR $TMP_DIR_PATH > $TMP_DIR_PATH/out
 PROCESS_OUTPUT=$?
-
-#MODIFICADO
-
-PID = ps -A | grep R | grep -v grep | cut -d " " -f 1,2
-echo $PID
-
-.collect-cpu.usage.sh $PID > $TEMP_DIR_PATH/cpu.txt
-
-#MODIFICADO
 
 echo "RScript_process_output=$PROCESS_OUTPUT"
 if [ $PROCESS_OUTPUT -eq 124 ]
