@@ -112,12 +112,12 @@ getBandsPath <- function(n.sensor){
   return(bands_path)
 }
 
-proc.time()
+#proc.time()
 
 # Reading
 fic.st <- stack(as.list(getBandsPath(n.sensor)))
 
-print(proc.time())
+#print(proc.time())
 
 ################################# Fmask ###########################################
 
@@ -136,14 +136,14 @@ for (i in 1:nlayers(fic.st)) {
   fic.st[[i]][] <- f 
 }
 
-print(proc.time())
+#print(proc.time())
 
 if (0.99<=(sum(is.na(values(fic.st)))/7)/(fic.st@ncols*fic.st@nrows)) { 
 	print("Imagem incompativel para o processamento,mais de 99% nuvem e sombra de nuvem")
 	quit("no", 1, FALSE)
 }
 
-print(proc.time())
+#print(proc.time())
 
 # Changing the projection of the images (UTM to GEO)
 # This operation can be done in a parallel way by Clusters, projectRaster is implemented to naturally be executed by clusters
@@ -153,7 +153,7 @@ print(proc.time())
 	fic.st <- projectRaster(fic.st, crs=WGS84)
 #endCluster()
 
-print(proc.time())
+#print(proc.time())
 
 # Reading Bounding Box
 # The Bounding Box area that is important and has less noise in the Image
@@ -167,7 +167,7 @@ fic.elevation <- paste(here("workspace/R", "Elevation/srtm_29_14.tif"))
 raster.elevation <- raster(fic.elevation)
 raster.elevation <- crop(raster.elevation, extent(BoundingBox))
 
-print(proc.time())
+#print(proc.time())
 
 # Setting the raster elevation resolution as equals to the Fmask raster resolution
 raster.elevation.aux <- raster(raster.elevation)
@@ -178,7 +178,7 @@ beginCluster(clusters) # ?? beginClusters, whereis endClusters??
 	raster.elevation <- resample(raster.elevation, raster.elevation.aux, method="ngb")
 endCluster()
 
-print(proc.time())
+#print(proc.time())
 
 #################### Resampling satellite bands images #####################################
 
@@ -210,7 +210,7 @@ tryCatch({
 
 ############################################################################################
 
-print(proc.time())
+#print(proc.time())
 
 # Reading file Station weather
 fic.sw <- dados$File.Station.Weather[1]
@@ -220,7 +220,7 @@ table.sw <- (read.csv(fic.sw, sep=";", header=FALSE, stringsAsFactors=FALSE))
 tal <- 0.75+2*10^-5*raster.elevation
 
 print(proc.time())
-print("Fim da fase 1 - pre-processamento")
+#print("Fim da fase 1 - pre-processamento")
 
 ################## Phase 1: Calculating the image energy balance ##################################
 
@@ -246,8 +246,8 @@ tryCatch({
 
 ###########################################################################################
 
-auxProc12 <- proc.time()
-print(auxProc12)
+#auxProc12 <- proc.time()
+#print(auxProc12)
 ################## Masking landsat rasters output #########################################
 
 # This block mask the values in the landsat output rasters that has cloud cells and are inside the Bounding Box required
@@ -273,7 +273,7 @@ tryCatch({
 
 ##########################################################################################
 
-print(proc.time())
+#print(proc.time())
 
 ################## Write to files landsat output rasters #################################
 
@@ -298,7 +298,7 @@ tryCatch({
   quit("no", 124, FALSE)
 })
 
-proc.time()
+#proc.time()
 
 #########################################################################################
 
@@ -309,13 +309,13 @@ dimLonDef <- NULL
 for(i in 1:length(variablesNames)){
 
 	end_file_name <- paste("_", variablesNames[i], ".nc", sep="")
-	proc.time()
+	#proc.time()
 
 	#Opening old NetCDF
 	var_output <- paste(dados$Path.Output[1], "/", fic, end_file_name, sep="")
 	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
 
-	proc.time()
+	#proc.time()
 
 	if(i == 1){
 		# Getting lat and lon values from old NetCDF
@@ -327,7 +327,7 @@ for(i in 1:length(variablesNames)){
 		dimLonDef <- ncdim_def("lon", "degrees", oldLon, unlim=FALSE, longname="longitude")
 	}
 
-	proc.time()
+	#proc.time()
 
 	#New file
 	file_output <- paste(dados$Path.Output[1], "/", fic, end_file_name, sep="")
@@ -338,16 +338,11 @@ for(i in 1:length(variablesNames)){
 	ncvar_put(newNCDF4, variablesNames[i], oldValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
 	nc_close(newNCDF4)
 
-	proc.time()
+	#proc.time()
 }
 
-####################################################
-# ESSA FUNÇÃO NCVAR_PUT ESTÁ COM OS PARÂMETROS CERTOS?
-# https://www.rdocumentation.org/packages/ncdf4/versions/1.16/topics/ncvar_put
-
-
 print(proc.time())
-print("Fim da fase 2 - Calculo do Rn e G")
+#print("Fim da fase 2 - Calculo do Rn e G")
 
 ################################################################################################
 
@@ -463,7 +458,7 @@ phase2 <- function() {
 	ll_ref<-rbind(ll.hot.f[1,],ll.cold.f[1,])
 	colnames(ll_ref)<-c("long", "lat")
 	rownames(ll_ref)<-c("hot","cold")
-	print(proc.time())
+	#print(proc.time())
 	
 	####################################################################################
 	
@@ -478,7 +473,7 @@ phase2 <- function() {
 #	bzom <- 6.47	#Parameter for the Zom image
 #	F_int <- 0.16	#internalization factor for Rs 24 calculation (default value)
 	
-	print(proc.time())
+	#print(proc.time())
 	
 	# Velocity 200 meters
 	u200 <- windVelocity200()
@@ -505,7 +500,7 @@ phase2 <- function() {
 	i<-1
 	Erro<-TRUE
 	
-	print(proc.time())
+	#print(proc.time())
 	# Beginning of the cycle stability
 	while(Erro){
 	  rah.hot.0<-value.pixel.rah[i] # Value
@@ -536,7 +531,7 @@ phase2 <- function() {
 	  i<-i+1
 	}
 	
-	print(proc.time())
+	#print(proc.time())
 	
 	# End sensible heat flux (H)
 	
@@ -545,14 +540,14 @@ phase2 <- function() {
 	b<-dt.hot/(value.pixels.ref["hot","TS"]-value.pixels.ref["cold","TS"]) 
 	a<- -b*(value.pixels.ref["cold","TS"]-273.15)                          
 	
-	print(proc.time())
+	#print(proc.time())
 	
 	# All pixels
 	
 	H<-rho*cp*(a+b*(TS[]-273.15))/rah[] # Vector 
 	H[(H>(Rn[]-G[]) &!is.na(H))]<-(Rn[]-G[])[(H>(Rn[]-G[]) &!is.na(H))] # Vector
 	
-	print(proc.time())
+	#print(proc.time())
 
 	# Instant latent heat flux (LE)
 	LE<-Rn[]-G[]-H
@@ -565,7 +560,7 @@ phase2 <- function() {
 	Ra24h<-(((24*60/pi)*Gsc*dr)*(omegas*sin(phi)*
 	        sin(sigma)+cos(phi)*cos(sigma)*sin(omegas)))*(1000000/86400)
 	
-	print(proc.time())
+	#print(proc.time())
 	
 	# Short wave radiation incident in 24 hours (Rs24h)
 	Rs24h<-F_int*sqrt(max(table.sw$V7[])-min(table.sw$V7[]))*Ra24h
@@ -587,13 +582,13 @@ phase2 <- function() {
 	ET24h_dB<-NDVI
 	ET24h_dB[]<-LE24h_dB*86400/((2.501-0.00236* (max(table.sw$V7[])+min(table.sw$V7[]))/2)*10^6)
 	
-	print(proc.time())
+	#print(proc.time())
 	
 	output.evapo<-stack(EF,ET24h_dB)
 	names(output.evapo)<-c('EF','ET24h')
 	writeRaster(output.evapo, output.path, overwrite=TRUE, format="CDF", varname=fic, varunit="daily", longname=fic, xname="lon", yname="lat", bylayer=TRUE, suffix="names")
 	
-	print(proc.time())
+	#print(proc.time())
 	
 	# Opening old EF NetCDF
 	var_output<-paste(dados$Path.Output[1],"/",fic,"_EF.nc",sep="")
@@ -608,7 +603,7 @@ phase2 <- function() {
 	ncvar_put(newEFNCDF4,"EF",oldEFValues,start=c(1,1,1),count=c(raster.elevation@ncols,raster.elevation@nrows,1))
 	nc_close(newEFNCDF4)
 	
-	print(proc.time())
+	#print(proc.time())
 	
 	# Opening old ET24h NetCDF
 	var_output<-paste(dados$Path.Output[1],"/",fic,"_ET24h.nc",sep="")
@@ -623,7 +618,7 @@ phase2 <- function() {
 	ncvar_put(newET24hNCDF4, "ET24h", oldET24hValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
 	nc_close(newET24hNCDF4)
 	
-	print(proc.time())
+	#print(proc.time())
 }
 
 tryCatch({
