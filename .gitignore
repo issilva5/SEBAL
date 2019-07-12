@@ -1,3 +1,10 @@
+/evaluation/cpu.csv
+/evaluation/disk.csv
+/evaluation/global_disk_usage.csv
+/evaluation/images-with-prepoc/
+/evaluation/images-without-prepoc/
+/evaluation/mem.csv
+/evaluation/proctimes.csv
 /target
 /13520010515
 /S06W037.hgt
