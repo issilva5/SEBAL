@@ -1,3 +1,6 @@
+/evaluation/images*
+/evaluation/global*
+/evaluation/*.csv
 /target
 /13520010515
 /S06W037.hgt
