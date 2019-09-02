@@ -6,6 +6,8 @@
 ########################################################################################
 
 options(echo=TRUE)
+options(digits=22)
+options(error=traceback)
 rm(list=ls())
 
 library(R.utils)
@@ -57,7 +59,7 @@ WGS84 <- "+proj=longlat +datum=WGS84 +ellps=WGS84"
 ######################### Image Information ######################################
 
 fic.dir <- dados$File.images[1]  # Images Directory
-
+print(fic.dir)
 MTL <- read.table(dados$MTL[1], skip=0, nrows=140, sep="=", quote = "''", as.is=TRUE) # Reading MTL File
 
 fic <- substr(MTL$V2[MTL$V1 == grep(pattern="LANDSAT_SCENE_ID", MTL$V1, value=T)], 3, 23)
@@ -165,18 +167,38 @@ BoundingBox <- BoundingBoxes[BoundingBoxes@data$WRSPR == WRSPR, ]
 # Read the File that stores the Elevation of the image area, this influence on some calculations
 fic.elevation <- paste(here("workspace/R", "Elevation/srtm_29_14.tif"))
 raster.elevation <- raster(fic.elevation)
+
+print("Raster elevation before crop")
+print(raster.elevation)
+
 raster.elevation <- crop(raster.elevation, extent(BoundingBox))
+
+print("Raster elevation after crop")
+print(raster.elevation)
 
 #print(proc.time())
 
 # Setting the raster elevation resolution as equals to the Fmask raster resolution
 raster.elevation.aux <- raster(raster.elevation)
+
+print("Raster elevation aux before resolution exchange for images band")
+print(raster.elevation.aux)
+
 res(raster.elevation.aux) <- res(fic.st) # The raster elevation aux resolution is the same of raster fmask
+
+print("Raster elevation aux after res")
+print(raster.elevation.aux)
 
 # Resample images
 beginCluster(clusters) # ?? beginClusters, whereis endClusters??
 	raster.elevation <- resample(raster.elevation, raster.elevation.aux, method="ngb")
 endCluster()
+
+print("Raster elevation after resampling")
+print(raster.elevation)
+
+print("Image band before resampling")
+print(fic.st[[1]])
 
 #print(proc.time())
 
@@ -207,8 +229,13 @@ tryCatch({
   cat("Image resample timedout. Exiting with 124 code...\n");
   quit("no", 124, FALSE)
 })
-
+#names(fic.st) <- c("B2", "B3", "B4", "B5", "B6", "B7", "B10")
+#output.path <- dados$Path.Output[1]
+#writeRaster(fic.st, output.path, overwrite=TRUE, format="CDF", varname = fic, varunit = "daily", longname = fic, xname = "lon", yname = "lat", bylayer=TRUE, suffix="names")
 ############################################################################################
+#quit()
+print("Image band after resampling")
+print(fic.st[[1]])
 
 #print(proc.time())
 
@@ -263,7 +290,7 @@ outputMask <- function() {
 
 res <- NULL;
 tryCatch({
-  res <- withTimeout({
+ res <- withTimeout({
     output <- outputMask();
   }, timeout=10800);
 }, TimeoutException=function(ex) {
@@ -358,16 +385,23 @@ print(proc.time())
     bzom <- 6.47    #Parameter for the Zom image
     F_int <- 0.16   #internalization factor for Rs 24 calculation (default value)
 
+print(trunc)
 
 
 hotPixelSelection <- function(Rn, G, TS, NDVI){
 
 	HO<-Rn[]-G[] # Read as a Vector
+	
 	x<-TS[][(NDVI[]>0.15 &!is.na(NDVI[]))  & (NDVI[]<0.20 &!is.na(NDVI[])) ] # Returns a vector
 	x<-x[x>273.16]
 	TS.c.hot<-sort(x)[round(0.95*length(x))] # Returns one value
 	HO.c.hot<-HO[][(NDVI[]>0.15 &!is.na(NDVI[])) & (NDVI[]<0.20 &!is.na(NDVI[])) & TS[]==TS.c.hot] # Returns one value
-	
+	print("NDVI ente 0.15 e 0.20")
+	print(length(x))
+	print("Temperatura escolhida")
+	print(TS.c.hot)
+	print("HO dos que tem essa temp")
+	print(HO.c.hot)
 	if (length(HO.c.hot)==1){
 		ll.hot<-which(TS[]==TS.c.hot & HO[]==HO.c.hot)
 		xy.hot <- xyFromCell(TS, ll.hot)
@@ -376,10 +410,18 @@ hotPixelSelection <- function(Rn, G, TS, NDVI){
 		HO.c.hot.min<-sort(HO.c.hot)[ceiling(0.25*length(HO.c.hot))]
 		HO.c.hot.max<-sort(HO.c.hot)[ceiling(0.75*length(HO.c.hot))]
 		ll.hot<-which(TS[]==TS.c.hot & HO[]>HO.c.hot.min & HO[]<HO.c.hot.max)
-		xy.hot <- xyFromCell(TS, ll.hot)
+                xy.hot <- xyFromCell(TS, ll.hot)
+		print("Localizacao dos pixels")
+		print(xFromCol(TS, xy.hot[,1]))
+		print(yFromRow(TS, xy.hot[,2]))
+		print(xy.hot)
 		NDVI.hot<-extract(NDVI,xy.hot, buffer=105)
 		NDVI.hot.2<-NDVI.hot[!sapply(NDVI.hot, is.null)]
+		print("Extract result")
+		print(NDVI.hot.2)
 		NDVI.hot.cv <- sapply(NDVI.hot.2,sd, na.rm=TRUE)/sapply(NDVI.hot.2, mean, na.rm=TRUE)
+                print("CVs")
+		print(NDVI.hot.cv)
 		i.NDVI.hot.cv<-which.min(NDVI.hot.cv)
 		ll.hot.f<-cbind(as.vector(xy.hot[i.NDVI.hot.cv,1]), as.vector(xy.hot[i.NDVI.hot.cv,2]))
 	}
@@ -397,7 +439,13 @@ coldPixelSelection <- function(Rn, G, TS, NDVI){
 	TS.c.cold<-sort(x)[round(0.5*length(x))]
 	
 	HO.c.cold<-HO[(NDVI[]<0 & !is.na(NDVI[])) & TS[]==TS.c.cold & !is.na(HO)]
-	
+	print("NDVI menor que 0")
+	print(length(x))
+	print("Temperatura escolhida")
+	print(TS.c.cold)
+	print("HOs dos que tem essa temp")
+	print(HO.c.cold)
+
 	if (length(HO.c.cold)==1){
 		ll.cold<-which(TS[]==TS.c.cold & HO==HO.c.cold)
 		xy.cold <- xyFromCell(TS, ll.cold)
@@ -406,18 +454,22 @@ coldPixelSelection <- function(Rn, G, TS, NDVI){
 		HO.c.cold.min<-sort(HO.c.cold)[ceiling(0.25*length(HO.c.cold))]
 		HO.c.cold.max<-sort(HO.c.cold)[ceiling(0.75*length(HO.c.cold))]
 		
-		ll.cold<-which(TS[]==TS.c.cold & (HO>=HO.c.cold.min &!is.na(HO)) & (HO<=HO.c.cold.max & !is.na(HO)))
-		
+		ll.cold<-which(TS[]==TS.c.cold & (HO>HO.c.cold.min &!is.na(HO)) & (HO<HO.c.cold.max & !is.na(HO)))
+		print(ll.cold)
+		print("Localizacao")
 		xy.cold <- xyFromCell(TS, ll.cold)
-		
+		print(xFromCol(TS, xy.cold[,1]))
+		print(yFromRow(TS, xy.cold[,2]))
+		print(xy.cold)
 		NDVI.cold<-extract(NDVI,xy.cold, buffer=105)
-		
+		print("Extract result")
+		print(NDVI.cold)
 		NDVI.cold.2<-NDVI.cold[!sapply(NDVI.cold, is.null)]
 		
 		# Maximum number of neighboring pixels with $NVDI < 0$
 		t<-function(x){ sum(x<0,na.rm = TRUE)}
 		n.neg.NDVI<-sapply(NDVI.cold.2,t)
-		
+		print(n.neg.NDVI)
 		i.NDVI.cold<-which.max(n.neg.NDVI)
 		
 		ll.cold.f<-cbind(as.vector(xy.cold[i.NDVI.cold,1]), as.vector(xy.cold[i.NDVI.cold,2]))
@@ -434,7 +486,7 @@ windVelocity200 <- function(){
 	ustar.est <- k*table.sw$V6[2]/log((x)/zom.est)
 	
 	# Velocity 200 meters
-	u200 <- ustar.est/k*log(200/zom.est)
+	u200 <- trunc(ustar.est/k*log(200/zom.est), 4)
 
 	return(u200)
 }
@@ -459,7 +511,7 @@ phase2 <- function() {
 	colnames(ll_ref)<-c("long", "lat")
 	rownames(ll_ref)<-c("hot","cold")
 	#print(proc.time())
-	
+	print(ll_ref)
 	####################################################################################
 	
 	# Weather station data
@@ -479,60 +531,120 @@ phase2 <- function() {
 	u200 <- windVelocity200()
 	
 	# Zom for all pixels
-	zom<-exp(azom+bzom*NDVI[]) # Changed from Raster to Vector
+	#zom<-exp(azom+bzom*NDVI[]) # Changed from Raster to Vector
+	zom <- NDVI
+	zom[] <- exp(azom+bzom*NDVI[])
+	zom[] <- trunc(zom[], 4)
+	print("Passou do zom")
 	
 	# Initial values
 	ustar<-NDVI
-	ustar[]<-k*u200/(log(200/zom))		# Friction velocity for all pixels #RASTER - VETOR 
+	ustar[]<-k*u200/(log(200/zom[]))		# Friction velocity for all pixels #RASTER - VETOR 
+	ustar[] <- trunc(ustar[], 4)
+	
+	ustar_before <- NDVI
+	ustar_before[] <- k*u200/(log(200/zom[])) #FIXME:
+	ustar_before[] <- trunc(ustar_before[], 4)
+	print("Passou ustar")
 	
 	rah<-NDVI
 	rah[]<-(log(2/0.1))/(ustar[]*k) 		# Aerodynamic resistance for all pixels #RASTER - VETOR
+	rah[] <- trunc(rah[], 4)
 	
+	rah_before <- NDVI
+	rah_before[] <-(log(2/0.1))/(ustar[]*k)  #FIXME:
+	rah_before[] <- trunc(rah_before[], 4)
+	print("Passou rah")
+
 	base_ref<-stack(NDVI,TS,Rn,G,ustar,rah) # Raster
 	nbase<-c("NDVI","TS","Rn","G")
 	names(base_ref)<-c(nbase,"ustar","rah")
 	
 	value.pixels.ref<-extract(base_ref,ll_ref)
 	rownames(value.pixels.ref)<-c("hot","cold")
-	H.hot<-value.pixels.ref["hot","Rn"]-value.pixels.ref["hot","G"]  
+	H.hot<-value.pixels.ref["hot","Rn"]-value.pixels.ref["hot","G"]
 	value.pixel.rah<-value.pixels.ref["hot","rah"]
-	
+	print(value.pixels.ref)
+
 	i<-1
 	Erro<-TRUE
-	
+	print("Before rah correct")
 	#print(proc.time())
 	# Beginning of the cycle stability
 	while(Erro){
 	  rah.hot.0<-value.pixel.rah[i] # Value
-	  
+	  print("rah.hot.0")
 	  # Hot and cold pixels      
 	  dt.hot<-H.hot*rah.hot.0/(rho*cp) # Value
 	  b<-dt.hot/(value.pixels.ref["hot","TS"]-value.pixels.ref["cold","TS"]) # Value
 	  a<- -b*(value.pixels.ref["cold","TS"]-273.15) # Value
-	  
+	  print("H.hot")
+	  print(H.hot)
+	  print("dt.hot")
+	  print(dt.hot)
+	  print("a")
+	  print(a)
+	  print("b")
+	  print(b)
+    	  print("before H")
 	  # All pixels
 	  H<-rho*cp*(a+b*(TS[]-273.15))/rah[] # Changed from Raster to Vector
+	  H <- trunc(H, 4)
 	  L<- -1*((rho*cp*ustar[]^3*TS[])/(k*g*H)) # Changed from Raster to Vector
+	  L <- trunc(L, 4)
 	  y_0.1<-(1-16*0.1/L)^0.25 # Changed from Raster to Vector
+	  y_0.1 <- trunc(y_0.1, 4)
 	  y_2<-(1-16*2/L)^0.25 # Changed from Raster to Vector
+	  y_2 <- trunc(y_2, 4)
 	  x200<-(1-16*200/L)^0.25 # Changed from Raster to Vector
+	  x200 <- trunc(x200, 4)
 	  psi_0.1<-2*log((1+y_0.1^2)/2) # Changed from Raster to Vector
 	  psi_0.1[L>0 &!is.na(L)]<--5*(0.1/L[L>0 &!is.na(L)]) # Changed from Raster to Vector
+	  psi_0.1 <- trunc(psi_0.1, 4)
 	  psi_2<-2*log((1+y_2^2)/2)  # Changed from Raster to Vector
 	  psi_2[L>0 &!is.na(L) ]<--5*(2/L[L>0 &!is.na(L)]) # Changed from Raster to Vector
+	  psi_2 <- trunc(psi_2, 4)
 	  psi_200<-2*log((1+x200)/2)+log((1+x200^2)/2)-2*atan(x200)+0.5*pi # Changed from Raster to Vector
 	  psi_200[L>0 &!is.na(L) ]<--5*(2/L[(L>0 &!is.na(L))]) # Changed from Raster to Vector
-	  ustar<-k*u200/(log(200/zom)-psi_200) # Changed from Raster to Vector # Friction velocity for all pixels
+	  psi_200 <- trunc(psi_200, 4)
+	  ustar<-k*u200/(log(200/zom[])-psi_200) # Changed from Raster to Vector # Friction velocity for all pixels
+	  ustar <- trunc(ustar, 4)
 	  rah<-NDVI
 	  rah[]<-(log(2/0.1)-psi_2+psi_0.1)/(ustar*k) # Changed from Raster to Vector # Aerodynamic resistency for all pixels
+	  rah[] <- trunc(rah[], 4)
 	  rah.hot<-extract(rah,matrix(ll_ref["hot",],1,2)) # Value
 	  value.pixel.rah<-c(value.pixel.rah,rah.hot) # Value
+	  print("after rah")
+	  print(i)
+	  print(value.pixel.rah)
 	  Erro<-(abs(1-rah.hot.0/rah.hot)>=0.05)
+	  print(abs(1-rah.hot.0/rah.hot))
 	  i<-i+1
 	}
-	
+	L_final <- NDVI
+	L_final[] <- L
+
+	y_0.1_final <- NDVI
+	y_0.1_final[] <- y_0.1
+
+	y_2_final <- NDVI
+	y_2_final[] <- y_2
+
+	x200_final <- NDVI
+	x200_final[] <- x200
+
+	psi_0.1_final <- NDVI
+	psi_0.1_final[] <- psi_0.1
+
+	psi_2_final <- NDVI
+	psi_2_final[] <- psi_2
+
+	psi_200_final <- NDVI
+	psi_200_final[] <- psi_200
+
+
 	#print(proc.time())
-	
+	print("After rah correct")
 	# End sensible heat flux (H)
 	
 	# Hot and cold pixels
@@ -543,15 +655,31 @@ phase2 <- function() {
 	#print(proc.time())
 	
 	# All pixels
-	
-	H<-rho*cp*(a+b*(TS[]-273.15))/rah[] # Vector 
+	H <-rho*cp*(a+b*(TS[]-273.15))/rah[] # Vector 
 	H[(H>(Rn[]-G[]) &!is.na(H))]<-(Rn[]-G[])[(H>(Rn[]-G[]) &!is.na(H))] # Vector
+	H <- trunc(H, 4)
 	
+	ustar_final <- NDVI
+	ustar_final[] <- ustar
+	print("Passou ustar final")
+
+	#rah_final <- NDVI
+	#rah_final[] <- rah
+	#print("Passou rah final")
+
+	H_final <- NDVI
+	#H_final[] <-rho*cp*(a+b*(TS[]-273.15))/rah[] # Vector 
+	#H_final[(H>(Rn[]-G[]) &!is.na(H))]<-(Rn[]-G[])[(H>(Rn[]-G[]) &!is.na(H))] # Vector
+	H_final[] <- H
+	print("Passou H final")
+
 	#print(proc.time())
 
 	# Instant latent heat flux (LE)
 	LE<-Rn[]-G[]-H
-	
+	LE_final <- NDVI
+	LE_final[] <- trunc(Rn[]-G[]-H, 4)
+	print("Passou LE")
 	# Upscalling temporal
 	dr<-(1/d_sun_earth$dist[Dia.juliano])^2 		# Inverse square of the distance on Earth-SOL
 	sigma<-0.409*sin(((2*pi/365)*Dia.juliano)-1.39) # Declination Solar (rad)
@@ -564,30 +692,57 @@ phase2 <- function() {
 	
 	# Short wave radiation incident in 24 hours (Rs24h)
 	Rs24h<-F_int*sqrt(max(table.sw$V7[])-min(table.sw$V7[]))*Ra24h
+	Rs24h <- trunc(Rs24h, 4)
 	
 	FL<-110                                
 	Rn24h_dB<-(1-alb[])*Rs24h-FL*Rs24h/Ra24h		# Method of Bruin #VETOR
-	
+	Rn24h_dB_final <- NDVI
+	Rn24h_dB_final[] <-(1-alb[])*Rs24h-FL*Rs24h/Ra24h
+	Rn24h_dB_final <- trunc(Rn24h_dB_final, 4)
+	print("Passou Rn24h")
 	# Evapotranspiration fraction Bastiaanssen
 	EF<-NDVI
 	EF[]<-LE/(Rn[]-G[])
+	EF[] <- trunc(EF[], 4)
 	
 	# Sensible heat flux 24 hours (H24h), nao foi usado
 	# H24h_dB<-(1-EF[])*Rn24h_dB
 	
 	# Latent Heat Flux 24 hours (LE24h)
 	LE24h_dB<-EF[]*Rn24h_dB
+	LE24h_dB_final <- NDVI
+	LE24h_dB_final[] <- EF[]*Rn24h_dB
+	LE24h_dB_final <- trunc(LE24h_dB_final, 4)
+	print("Passou LE24h")
 	
 	# Evapotranspiration 24 hours (ET24h)
 	ET24h_dB<-NDVI
 	ET24h_dB[]<-LE24h_dB*86400/((2.501-0.00236* (max(table.sw$V7[])+min(table.sw$V7[]))/2)*10^6)
-	
+	ET24h_dB[] <- trunc(ET24h_dB[], 4)
+	print("Antes de salvar")
 	#print(proc.time())
 	
-	output.evapo<-stack(EF,ET24h_dB)
-	names(output.evapo)<-c('EF','ET24h')
+	print(zom)
+	print(ustar_before)
+	print(rah_before)
+	print(ustar_final)
+	print(rah)
+	print(H_final)
+	print(LE_final)
+	print(Rn24h_dB_final)
+	print(LE24h_dB_final)
+	print(EF)
+	print(ET24h_dB)
+
+	output.evapo<-stack(zom, ustar_before, rah_before, ustar_final, rah, H_final, LE_final, Rn24h_dB_final, LE24h_dB_final, EF, ET24h_dB, L_final, y_0.1_final, y_2_final, x200_final, psi_0.1_final, psi_2_final, psi_200_final)
+	print(nlayers(output.evapo))
+	print(output.evapo)
+	output.names <- c('zom', 'ustar', 'Rah', 'ustar_after', 'Rah_after', 'H', 'LatentHF', 'Rn24h', 'LatentHF24h', 'EF', 'ET24h', 'L', 'y01', 'y2', 'x200', 'psi01', 'psi2', 'psi200')
+	print(length(output.names))
+	print(output.names)
+	names(output.evapo) <- output.names
 	writeRaster(output.evapo, output.path, overwrite=TRUE, format="CDF", varname=fic, varunit="daily", longname=fic, xname="lon", yname="lat", bylayer=TRUE, suffix="names")
-	
+	print("Depois do writeRaster")
 	#print(proc.time())
 	
 	# Opening old EF NetCDF
@@ -617,6 +772,246 @@ phase2 <- function() {
 	newET24hNCDF4<-nc_create(file_output,newET24hValues)
 	ncvar_put(newET24hNCDF4, "ET24h", oldET24hValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
 	nc_close(newET24hNCDF4)
+	
+	#print(proc.time())
+	#FIXME:
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_zom.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New zom file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_zom.nc",sep="")
+	oldzomValues<-ncvar_get(nc,fic)
+	newzomValues<-ncvar_def("zom","daily", list(dimLonDef, dimLatDef, tdim), longname="zom", missval=NaN, prec="double")
+	nc_close(nc)
+	newzomNCDF4<-nc_create(file_output,newzomValues)
+	ncvar_put(newzomNCDF4, "zom", oldzomValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newzomNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_ustar.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New ustar file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_ustar.nc",sep="")
+	oldustarValues<-ncvar_get(nc,fic)
+	newustarValues<-ncvar_def("ustar","daily", list(dimLonDef, dimLatDef, tdim), longname="ustar", missval=NaN, prec="double")
+	nc_close(nc)
+	newustarNCDF4<-nc_create(file_output,newustarValues)
+	ncvar_put(newustarNCDF4, "ustar", oldustarValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newustarNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_Rah.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New Rah file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_Rah.nc",sep="")
+	oldRahValues<-ncvar_get(nc,fic)
+	newRahValues<-ncvar_def("Rah","daily", list(dimLonDef, dimLatDef, tdim), longname="Rah", missval=NaN, prec="double")
+	nc_close(nc)
+	newRahNCDF4<-nc_create(file_output,newRahValues)
+	ncvar_put(newRahNCDF4, "Rah", oldRahValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newRahNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_ustar_after.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New ustar_after file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_ustar_after.nc",sep="")
+	oldustar_afterValues<-ncvar_get(nc,fic)
+	newustar_afterValues<-ncvar_def("ustar_after","daily", list(dimLonDef, dimLatDef, tdim), longname="ustar_after", missval=NaN, prec="double")
+	nc_close(nc)
+	newustar_afterNCDF4<-nc_create(file_output,newustar_afterValues)
+	ncvar_put(newustar_afterNCDF4, "ustar_after", oldustar_afterValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newustar_afterNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_Rah_after.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New Rah_after file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_Rah_after.nc",sep="")
+	oldRah_afterValues<-ncvar_get(nc,fic)
+	newRah_afterValues<-ncvar_def("Rah_after","daily", list(dimLonDef, dimLatDef, tdim), longname="Rah_after", missval=NaN, prec="double")
+	nc_close(nc)
+	newRah_afterNCDF4<-nc_create(file_output,newRah_afterValues)
+	ncvar_put(newRah_afterNCDF4, "Rah_after", oldRah_afterValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newRah_afterNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_H.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New H file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_H.nc",sep="")
+	oldHValues<-ncvar_get(nc,fic)
+	newHValues<-ncvar_def("H","daily", list(dimLonDef, dimLatDef, tdim), longname="H", missval=NaN, prec="double")
+	nc_close(nc)
+	newHNCDF4<-nc_create(file_output,newHValues)
+	ncvar_put(newHNCDF4, "H", oldHValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newHNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_LatentHF.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New LatentHF file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_LatentHF.nc",sep="")
+	oldLatentHFValues<-ncvar_get(nc,fic)
+	newLatentHFValues<-ncvar_def("LatentHF","daily", list(dimLonDef, dimLatDef, tdim), longname="LatentHF", missval=NaN, prec="double")
+	nc_close(nc)
+	newLatentHFNCDF4<-nc_create(file_output,newLatentHFValues)
+	ncvar_put(newLatentHFNCDF4, "LatentHF", oldLatentHFValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newLatentHFNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_Rn24h.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New Rn24h file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_Rn24h.nc",sep="")
+	oldRn24hValues<-ncvar_get(nc,fic)
+	newRn24hValues<-ncvar_def("Rn24h","daily", list(dimLonDef, dimLatDef, tdim), longname="Rn24h", missval=NaN, prec="double")
+	nc_close(nc)
+	newRn24hNCDF4<-nc_create(file_output,newRn24hValues)
+	ncvar_put(newRn24hNCDF4, "Rn24h", oldRn24hValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newRn24hNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_LatentHF24h.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New LatentHF24h file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_LatentHF24h.nc",sep="")
+	oldLatentHF24hValues<-ncvar_get(nc,fic)
+	newLatentHF24hValues<-ncvar_def("LatentHF24h","daily", list(dimLonDef, dimLatDef, tdim), longname="LatentHF24h", missval=NaN, prec="double")
+	nc_close(nc)
+	newLatentHF24hNCDF4<-nc_create(file_output,newLatentHF24hValues)
+	ncvar_put(newLatentHF24hNCDF4, "LatentHF24h", oldLatentHF24hValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newLatentHF24hNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_L.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New L file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_L.nc",sep="")
+	oldLValues<-ncvar_get(nc,fic)
+	newLValues<-ncvar_def("L","daily", list(dimLonDef, dimLatDef, tdim), longname="L", missval=NaN, prec="double")
+	nc_close(nc)
+	newLNCDF4<-nc_create(file_output,newLValues)
+	ncvar_put(newLNCDF4, "L", oldLValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newLNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_y01.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New L file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_y01.nc",sep="")
+	oldLValues<-ncvar_get(nc,fic)
+	newLValues<-ncvar_def("y01","daily", list(dimLonDef, dimLatDef, tdim), longname="L", missval=NaN, prec="double")
+	nc_close(nc)
+	newLNCDF4<-nc_create(file_output,newLValues)
+	ncvar_put(newLNCDF4, "y01", oldLValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newLNCDF4)
+	
+	#print(proc.time())
+	
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_y2.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New L file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_y2.nc",sep="")
+	oldLValues<-ncvar_get(nc,fic)
+	newLValues<-ncvar_def("y2","daily", list(dimLonDef, dimLatDef, tdim), longname="L", missval=NaN, prec="double")
+	nc_close(nc)
+	newLNCDF4<-nc_create(file_output,newLValues)
+	ncvar_put(newLNCDF4, "y2", oldLValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newLNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_x200.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New L file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_x200.nc",sep="")
+	oldLValues<-ncvar_get(nc,fic)
+	newLValues<-ncvar_def("x200","daily", list(dimLonDef, dimLatDef, tdim), longname="L", missval=NaN, prec="double")
+	nc_close(nc)
+	newLNCDF4<-nc_create(file_output,newLValues)
+	ncvar_put(newLNCDF4, "x200", oldLValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newLNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_psi01.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New L file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_psi01.nc",sep="")
+	oldLValues<-ncvar_get(nc,fic)
+	newLValues<-ncvar_def("psi01","daily", list(dimLonDef, dimLatDef, tdim), longname="L", missval=NaN, prec="double")
+	nc_close(nc)
+	newLNCDF4<-nc_create(file_output,newLValues)
+	ncvar_put(newLNCDF4, "psi01", oldLValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newLNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_psi2.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New L file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_psi2.nc",sep="")
+	oldLValues<-ncvar_get(nc,fic)
+	newLValues<-ncvar_def("psi2","daily", list(dimLonDef, dimLatDef, tdim), longname="L", missval=NaN, prec="double")
+	nc_close(nc)
+	newLNCDF4<-nc_create(file_output,newLValues)
+	ncvar_put(newLNCDF4, "psi2", oldLValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newLNCDF4)
+	
+	#print(proc.time())
+
+	# Opening old ET24h NetCDF
+	var_output<-paste(dados$Path.Output[1],"/",fic,"_psi200.nc",sep="")
+	nc<-nc_open(var_output, write=TRUE, readunlim=FALSE, verbose=TRUE, auto_GMT=FALSE, suppress_dimvals=FALSE)
+	
+	# New L file name
+	file_output<-paste(dados$Path.Output[1],"/",fic,"_psi200.nc",sep="")
+	oldLValues<-ncvar_get(nc,fic)
+	newLValues<-ncvar_def("psi200","daily", list(dimLonDef, dimLatDef, tdim), longname="L", missval=NaN, prec="double")
+	nc_close(nc)
+	newLNCDF4<-nc_create(file_output,newLValues)
+	ncvar_put(newLNCDF4, "psi200", oldLValues, start=c(1, 1, 1), count=c(raster.elevation@ncols, raster.elevation@nrows, 1))
+	nc_close(newLNCDF4)
 	
 	#print(proc.time())
 }

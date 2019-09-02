@@ -15,3 +15,15 @@
 /SEBAL-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 /result2.csv
 /N01W059.hgt
+evaluation/scripts-plot-monitor/Rplots.pdf
+evaluation/scripts-plot-monitor/usage_cpu.png
+evaluation/scripts-plot-monitor/usage_cpu_mem.png
+evaluation/scripts-plot-monitor/usage_disk.png
+evaluation/scripts-plot-monitor/usage_mem.png
+workspace/R/Algoritmo-completo-v24012019or.R
+workspace/R/landsat2or.R
+workspace/R/wrs2_asc_desc/new_shape.dbf
+workspace/R/wrs2_asc_desc/new_shape.prj
+workspace/R/wrs2_asc_desc/new_shape.qpj
+workspace/R/wrs2_asc_desc/new_shape.shp
+workspace/R/wrs2_asc_desc/new_shape.shx
