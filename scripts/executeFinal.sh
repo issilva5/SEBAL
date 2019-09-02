@@ -34,3 +34,4 @@ do
 
     echo "Finalizando teste " ${i}
 done
+
